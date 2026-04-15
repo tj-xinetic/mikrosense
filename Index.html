@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mikrobotik IR Health Check</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; text-align: center; margin: 0; padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; max-width: 1000px; margin: 20px auto; }
+        .sensor-card { background: #1e1e1e; border: 2px solid #333; border-radius: 12px; padding: 15px; transition: 0.3s; }
+        .val { font-size: 2.2rem; font-weight: 800; margin: 5px 0; color: #00d4ff; }
+        .minmax { font-size: 0.85rem; color: #888; border-top: 1px solid #333; padding-top: 8px; margin-top: 8px; }
+        .status { font-weight: bold; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 10px; }
+        .good { background: #064e3b; color: #34d399; }
+        .bad { background: #7f1d1d; color: #f87171; border: 1px solid #f87171; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        button { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🛰️ Mikrobotik IR Health</h1>
+    <button id="connectBtn">Connect via OTG</button>
+    <div id="sensorGrid" class="grid"></div>
+
+    <script>
+        let port, reader, sensorData = {};
+        const DEV_LIMIT = 150; // Max allowed deviation from the group average
+
+        document.getElementById('connectBtn').onclick = async () => {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+            document.getElementById('connectBtn').innerText = "✅ Connected";
+            readData();
+        };
+
+        async function readData() {
+            const decoder = new TextDecoderStream();
+            port.readable.pipeTo(decoder.writable);
+            const inputStream = decoder.readable;
+            reader = inputStream.getReader();
+            let buffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += value;
+                if (buffer.includes('\n')) {
+                    const lines = buffer.split('\n');
+                    parseLine(lines[0]);
+                    buffer = lines[1] || "";
+                }
+            }
+        }
+
+        function parseLine(line) {
+            const parts = line.trim().split(',');
+            let currentBatch = [];
+            
+            parts.forEach(p => {
+                const [id, val] = p.split(':');
+                const n = parseInt(val);
+                if (isNaN(n)) return;
+
+                if (!sensorData[id]) sensorData[id] = { min: n, max: n };
+                sensorData[id].curr = n;
+                sensorData[id].min = Math.min(sensorData[id].min, n);
+                sensorData[id].max = Math.max(sensorData[id].max, n);
+                currentBatch.push(n);
+            });
+
+            const avg = currentBatch.reduce((a, b) => a + b, 0) / currentBatch.length;
+            updateUI(avg);
+        }
+
+        function updateUI(avg) {
+            const grid = document.getElementById('sensorGrid');
+            grid.innerHTML = "";
+            Object.keys(sensorData).forEach(id => {
+                const s = sensorData[id];
+                const deviation = Math.abs(s.curr - avg);
+                
+                // Evaluation Logic:
+                // 1. Deviates too much from neighbors
+                // 2. Frozen range (min and max are too close, sensor isn't "seeing")
+                const range = s.max - s.min;
+                const isBad = deviation > DEV_LIMIT || (range < 10 && s.max > 0);
+                
+                const card = document.createElement('div');
+                card.className = `sensor-card ${isBad ? 'bad-border' : ''}`;
+                card.innerHTML = `
+                    <div>Sensor ${id}</div>
+                    <div class="val" style="color:${isBad ? '#f87171' : '#00d4ff'}">${s.curr}</div>
+                    <div class="status ${isBad ? 'bad' : 'good'}">${isBad ? '⚠️ BAD SENSOR' : 'GOOD'}</div>
+                    <div class="minmax">
+                        MIN: ${s.min} | MAX: ${s.max}<br>
+                        Range: ${range}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
