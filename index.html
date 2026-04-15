@@ -3,63 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Index</title>
+    <title>Mikrobotik IR Health Check</title>
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
-        header {
-            background: #35424a;
-            color: #ffffff;
-            padding: 20px 0;
-            text-align: center;
-        }
-        .container {
-            width: 80%;
-            margin: auto;
-            overflow: hidden;
-        }
-        .card {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            margin: 20px;
-            padding: 20px;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            color: #e0e0e0; 
+            text-align: center; 
+            padding: 30px 20px;
+            min-height: 100vh;
         }
         h1 {
-            color: #35424a;
+            font-size: 2.5rem;
+            margin-bottom: 25px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+            letter-spacing: 1px;
         }
-        .button {
-            display: inline-block;
-            box-sizing: border-box;
-            width: 200px;
-            height: 40px;
-            background: #35424a;
-            color: white;
-            text-align: center;
-            line-height: 40px;
-            border-radius: 5px;
-            text-decoration: none;
-            transition: background 0.3s ease;
+        button { 
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white; 
+            border: none; 
+            padding: 14px 32px; 
+            border-radius: 8px; 
+            font-size: 1rem; 
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+            margin-bottom: 30px;
         }
-        .button:hover {
-            background: #1a1c20;
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 20px; 
+            max-width: 1200px; 
+            margin: 0 auto;
+        }
+        .sensor-card { 
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            border: 2px solid #333;
+            border-radius: 12px; 
+            padding: 20px; 
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .sensor-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d4ff, #0099cc);
+        }
+        .sensor-card:hover {
+            transform: translateY(-5px);
+            border-color: #00d4ff;
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.2);
+        }
+        .sensor-id {
+            font-size: 0.9rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .val { 
+            font-size: 2.5rem; 
+            font-weight: 900; 
+            margin: 12px 0; 
+            color: #00d4ff;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+        .status { 
+            font-weight: bold; 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            display: inline-block; 
+            margin-top: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .good { 
+            background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+            color: #34d399; 
+            border: 1px solid #34d399;
+        }
+        .bad { 
+            background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+            color: #fca5a5; 
+            border: 1px solid #f87171;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 
+            0% { opacity: 1; } 
+            50% { opacity: 0.7; } 
+            100% { opacity: 1; } 
+        }
+        .minmax { 
+            font-size: 0.8rem; 
+            color: #999; 
+            border-top: 1px solid #444; 
+            padding-top: 10px; 
+            margin-top: 12px;
+            line-height: 1.6;
+        }
+        .minmax-label {
+            color: #666;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+        .minmax-value {
+            color: #aaa;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>Welcome to Mikrosense</h1>
-    </header>
-    <div class="container">
-        <div class="card">
-            <h2>Card Title</h2>
-            <p>This is an example card. It can contain any content you'd like!</p>
-            <a href="#" class="button">Click Me</a>
-        </div>
-    </div>
+    <h1>🛰️ Mikrobotik IR Health</h1>
+    <button id="connectBtn">📡 Connect via OTG</button>
+    <div id="sensorGrid" class="grid"></div>
+
+    <script>
+        let port, reader, sensorData = {};
+        const DEV_LIMIT = 150;
+
+        document.getElementById('connectBtn').onclick = async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+                document.getElementById('connectBtn').innerText = "✅ Connected";
+                document.getElementById('connectBtn').disabled = true;
+                readData();
+            } catch (err) {
+                console.error('Connection error:', err);
+            }
+        };
+
+        async function readData() {
+            const decoder = new TextDecoderStream();
+            port.readable.pipeTo(decoder.writable);
+            const inputStream = decoder.readable;
+            reader = inputStream.getReader();
+            let buffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += value;
+                if (buffer.includes('\n')) {
+                    const lines = buffer.split('\n');
+                    parseLine(lines[0]);
+                    buffer = lines[1] || "";
+                }
+            }
+        }
+
+        function parseLine(line) {
+            const parts = line.trim().split(',');
+            let currentBatch = [];
+            
+            parts.forEach(p => {
+                const [id, val] = p.split(':');
+                const n = parseInt(val);
+                if (isNaN(n)) return;
+
+                if (!sensorData[id]) sensorData[id] = { min: n, max: n };
+                sensorData[id].curr = n;
+                sensorData[id].min = Math.min(sensorData[id].min, n);
+                sensorData[id].max = Math.max(sensorData[id].max, n);
+                currentBatch.push(n);
+            });
+
+            const avg = currentBatch.reduce((a, b) => a + b, 0) / currentBatch.length;
+            updateUI(avg);
+        }
+
+        function updateUI(avg) {
+            const grid = document.getElementById('sensorGrid');
+            grid.innerHTML = "";
+            Object.keys(sensorData).sort().forEach(id => {
+                const s = sensorData[id];
+                const deviation = Math.abs(s.curr - avg);
+                const range = s.max - s.min;
+                const isBad = deviation > DEV_LIMIT || (range < 10 && s.max > 0);
+                
+                const card = document.createElement('div');
+                card.className = 'sensor-card';
+                card.innerHTML = `
+                    <div class="sensor-id">Sensor ${id}</div>
+                    <div class="val" style="color:${isBad ? '#fca5a5' : '#00d4ff'}">${s.curr}</div>
+                    <div class="status ${isBad ? 'bad' : 'good'}">${isBad ? '⚠️ BAD' : '✓ GOOD'}</div>
+                    <div class="minmax">
+                        <div><span class="minmax-label">MIN:</span> <span class="minmax-value">${s.min}</span></div>
+                        <div><span class="minmax-label">MAX:</span> <span class="minmax-value">${s.max}</span></div>
+                        <div><span class="minmax-label">RANGE:</span> <span class="minmax-value">${range}</span></div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+    </script>
 </body>
 </html>
