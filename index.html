@@ -50,17 +50,17 @@
         .active-display { font-size: 1.2rem; font-weight: bold; color: #38bdf8; text-align: center; padding: 10px; background: #0f172a; border-radius: 8px; border: 2px solid #0ea5e9; margin-top: 10px;}
 
         /* PID Suggestion Styles */
-        .pid-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        .pid-card { background: #0f172a; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #38bdf8; }
-        .pid-title { font-size: 0.9rem; font-weight: bold; color: #cbd5e1; }
-        .pid-val { font-size: 1.5rem; font-weight: 900; color: white; }
-        .pid-desc { font-size: 0.75rem; color: #64748b; margin-top: 5px; }
+        .pid-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } /* Changed to 2 columns for better layout */
+        .pid-card { background: #0f172a; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; border-left: 4px solid #38bdf8; }
+        .pid-title { font-size: 0.85rem; font-weight: bold; color: #cbd5e1; }
+        .pid-val { font-size: 1.4rem; font-weight: 900; color: white; margin-top: 5px; }
+        .pid-desc { font-size: 0.7rem; color: #64748b; margin-top: 2px; line-height: 1.2; }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo">Mikrobotik Race Engineer</div>
+        <div class="logo">Mikrobotik Race Engineer By Tj</div>
         <button id="connectBtn">🔌 Connect USB</button>
     </header>
 
@@ -115,13 +115,13 @@
 
                 <div class="radio-group">
                     <div class="radio-item">
-                        <input type="radio" name="mode" value="normal"> <label>Use Normal Suggestion</label>
+                        <input type="radio" name="mode" value="normal"> <label>Use Normal</label>
                     </div>
                     <div class="radio-item" style="border-color: #eab308;">
-                        <input type="radio" name="mode" value="bump" checked> <label>Use Bump Compensated</label>
+                        <input type="radio" name="mode" value="bump" checked> <label>Use Compensated</label>
                     </div>
                     <div class="radio-item">
-                        <input type="radio" name="mode" value="manual"> <label>Manual Override:</label>
+                        <input type="radio" name="mode" value="manual"> <label>Override:</label>
                         <input type="number" id="manualInput" value="350" style="width: 70px; padding: 3px; border-radius: 4px; background:#1e293b; color:white; border:1px solid #334155;">
                     </div>
                 </div>
@@ -136,16 +136,24 @@
             <h2>Mission Parameters (Auto-Tuned)</h2>
             <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 15px;">
                 Track Safety Margin: <strong id="marginDisp" class="text-gray">WAITING</strong><br>
-                Based on the gap between your max black and white bumps.
+                Based on the gap between max black and white bumps.
             </div>
 
             <div class="pid-grid">
                 <div class="pid-card" style="border-left-color: #a855f7;">
                     <div>
-                        <div class="pid-title">Max Safe Speed</div>
-                        <div class="pid-desc">Suggested motor power</div>
+                        <div class="pid-title">Max Straight Speed</div>
+                        <div class="pid-desc">Power on flat sections</div>
                     </div>
                     <div class="pid-val" id="recSpeed">--</div>
+                </div>
+
+                <div class="pid-card" style="border-left-color: #f97316;">
+                    <div>
+                        <div class="pid-title">Max Turn Speed</div>
+                        <div class="pid-desc">Prevents line skipping</div>
+                    </div>
+                    <div class="pid-val" id="recTurn">--</div>
                 </div>
                 
                 <div class="pid-card" style="border-left-color: #3b82f6;">
@@ -154,14 +162,6 @@
                         <div class="pid-desc">Turn aggression</div>
                     </div>
                     <div class="pid-val" id="recP">--</div>
-                </div>
-
-                <div class="pid-card" style="border-left-color: #ef4444;">
-                    <div>
-                        <div class="pid-title">Ki (Integral)</div>
-                        <div class="pid-desc">Error memory</div>
-                    </div>
-                    <div class="pid-val" id="recI">0.00</div>
                 </div>
 
                 <div class="pid-card" style="border-left-color: #10b981;">
@@ -178,18 +178,15 @@
     <script>
         let port, reader, isConnected = false;
         
-        // Memory variables
         let globalMin = 1023;
         let globalMax = 0;
         
-        // Logic variables
         let userPercent = 50;
         let bumpValue = 300;
         let manualValue = 350;
         let activeMode = "bump"; 
         let currentThreshold = 350;
 
-        // DOM Elements
         const percInput = document.getElementById('percInput');
         const bumpInput = document.getElementById('bumpInput');
         const manualInput = document.getElementById('manualInput');
@@ -236,7 +233,6 @@
                 let safeBump = Math.min(bumpValue, globalMax - 1); 
                 bumpSuggest = Math.floor(safeBump + ((globalMax - safeBump) * p));
                 
-                // Calculate PID & Speed based on track margin
                 calculatePID(globalMax, safeBump);
             }
 
@@ -254,34 +250,34 @@
             let margin = max - bump;
             const marginEl = document.getElementById('marginDisp');
             const sEl = document.getElementById('recSpeed');
+            const tEl = document.getElementById('recTurn');
             const pEl = document.getElementById('recP');
             const dEl = document.getElementById('recD');
 
             if (margin < 60) {
-                // High risk, very bumpy
                 marginEl.innerText = margin + " (DANGEROUS)";
                 marginEl.className = "text-red";
-                sEl.innerText = "50 - 60";
+                sEl.innerText = "120 - 150";
+                tEl.innerText = "70 - 90";
                 pEl.innerText = "0.05";
                 dEl.innerText = "0.80";
             } else if (margin < 120) {
-                // Medium risk
                 marginEl.innerText = margin + " (MODERATE)";
                 marginEl.className = "text-yellow";
-                sEl.innerText = "65 - 75";
+                sEl.innerText = "165 - 190";
+                tEl.innerText = "90 - 120";
                 pEl.innerText = "0.07";
                 dEl.innerText = "0.60";
             } else {
-                // Low risk, good track
                 marginEl.innerText = margin + " (SAFE)";
                 marginEl.className = "text-green";
-                sEl.innerText = "80 - 100";
+                sEl.innerText = "200 - 255";
+                tEl.innerText = "120 - 150"; 
                 pEl.innerText = "0.09";
                 dEl.innerText = "0.30";
             }
         }
 
-        // Serial Connection Logic
         navigator.serial.addEventListener("disconnect", (event) => {
             if (port && event.target === port) forceDisconnectUI();
         });
