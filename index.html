@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mikrobotik Pro Dashboard</title>
+    <title>Mikrobotik Line Sensor Detection By Tj</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
         /* Header */
         header { background: #1e293b; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; }
-        .logo { font-size: 1.5rem; font-weight: 900; color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; }
+        .logo { font-size: 1.2rem; font-weight: 900; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; }
         button { background: #0ea5e9; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button.connected { background: #10b981; }
+        button.connected { background: #ef4444; } /* Changed to Red for Disconnect */
 
         /* Main Content Grid */
         .dashboard { display: grid; grid-template-columns: 1fr; gap: 15px; padding: 15px; flex-grow: 1; overflow-y: auto; }
@@ -34,6 +34,7 @@
         .text-red { color: #ef4444 !important; }
         .text-green { color: #10b981 !important; }
         .text-yellow { color: #eab308 !important; }
+        .text-gray { color: #64748b !important; }
 
         /* Threshold Slider */
         .controls { display: flex; flex-direction: column; gap: 10px; }
@@ -66,11 +67,11 @@
             <div class="status-grid">
                 <div class="stat-box">
                     <div class="stat-label">Line Position</div>
-                    <div class="stat-value" id="posText">WAITING</div>
+                    <div class="stat-value text-gray" id="posText">WAITING</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Junction Detection</div>
-                    <div class="stat-value" id="juncText">--</div>
+                    <div class="stat-value text-gray" id="juncText">--</div>
                 </div>
             </div>
         </div>
@@ -93,10 +94,13 @@
     </div>
 
     <script>
-        let port, reader;
+        let port;
+        let reader;
         let threshold = 500;
+        let isConnected = false;
         const slider = document.getElementById('thresholdSlider');
         const threshDisp = document.getElementById('threshDisp');
+        const connectBtn = document.getElementById('connectBtn');
 
         // Update threshold when slider moves
         slider.addEventListener('input', (e) => {
@@ -104,67 +108,106 @@
             threshDisp.innerText = threshold;
         });
 
-        document.getElementById('connectBtn').addEventListener('click', async () => {
+        // Listen for physical cable disconnects via the browser hardware API
+        navigator.serial.addEventListener("disconnect", (event) => {
+            if (port && event.target === port) {
+                forceDisconnectUI();
+            }
+        });
+
+        connectBtn.addEventListener('click', async () => {
+            if (isConnected) {
+                // If they click the button while connected, forcefully disconnect
+                try {
+                    if (reader) {
+                        await reader.cancel();
+                        reader.releaseLock();
+                    }
+                    if (port) await port.close();
+                } catch(e) {}
+                forceDisconnectUI();
+                return;
+            }
+
             try {
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 115200 });
-                const btn = document.getElementById('connectBtn');
-                btn.innerText = "✅ CONNECTED";
-                btn.classList.add('connected');
+                isConnected = true;
+                connectBtn.innerText = "🔌 Disconnect";
+                connectBtn.classList.add('connected');
                 readData();
             } catch (err) {
-                alert("Failed to connect. Make sure no other program (like Arduino IDE) is using the port!");
+                alert("Connection failed or canceled.");
+                forceDisconnectUI();
             }
         });
 
         async function readData() {
-            const decoder = new TextDecoderStream();
-            port.readable.pipeTo(decoder.writable);
-            reader = decoder.readable.getReader();
-            let buffer = "";
+            try {
+                const decoder = new TextDecoderStream();
+                port.readable.pipeTo(decoder.writable);
+                reader = decoder.readable.getReader();
+                let buffer = "";
 
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                buffer += value;
-                
-                // ROBUST BUFFER PARSING: Prevents crashing or dropped data
-                let lines = buffer.split('\n');
-                buffer = lines.pop(); // Keep the last incomplete piece in the buffer
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += value;
+                    
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep the incomplete piece in buffer
 
-                for (let line of lines) {
-                    if (line.trim().length > 0) {
-                        processLine(line.trim());
+                    for (let line of lines) {
+                        if (line.trim().length > 0) {
+                            processLine(line.trim());
+                        }
                     }
                 }
+            } catch (error) {
+                // This catches the error specifically when the USB cable is yanked out mid-stream
+                console.warn("Stream broken or cable disconnected.");
+                forceDisconnectUI();
+            } finally {
+                if (reader) reader.releaseLock();
+            }
+        }
+
+        function forceDisconnectUI() {
+            isConnected = false;
+            connectBtn.innerText = "🔌 Connect USB";
+            connectBtn.classList.remove('connected');
+            
+            // Reset UI states
+            document.getElementById('posText').innerText = "DISCONNECTED";
+            document.getElementById('posText').className = "stat-value text-red";
+            document.getElementById('juncText').innerText = "--";
+            document.getElementById('juncText').className = "stat-value text-gray";
+            document.getElementById('rawGrid').innerHTML = "";
+            
+            // Turn off all dots
+            for(let i=1; i<=5; i++) {
+                document.getElementById(`dot${i}`).classList.remove('active');
             }
         }
 
         function processLine(line) {
-            // Expected format: s1:100,s2:500,s3:800,s4:100,s5:100
             const parts = line.split(',');
             if (parts.length < 5) return; 
 
-            let values = [];
-            let activeSensors = []; // Stores index of sensors seeing the line
+            let activeSensors = []; 
             
-            // Parse raw data
             const rawHtml = parts.map((p, index) => {
                 const [id, valStr] = p.split(':');
                 const val = parseInt(valStr);
                 if(isNaN(val)) return '';
-                values.push(val);
                 
-                // Is this sensor seeing the line?
                 const isLine = val > threshold;
                 if(isLine) activeSensors.push(index + 1);
 
-                // Update Visual Dot
                 const dot = document.getElementById(`dot${index + 1}`);
                 if (isLine) dot.classList.add('active');
                 else dot.classList.remove('active');
 
-                // Generate Raw HTML block
                 return `
                     <div class="raw-card">
                         <div style="font-size:0.7rem; color:#94a3b8;">S${index+1}</div>
@@ -181,7 +224,6 @@
             const juncEl = document.getElementById('juncText');
             const count = active.length;
 
-            // 1. JUNCTION DETECTION
             if (count >= 4) {
                 juncEl.innerText = "CROSS ➕";
                 juncEl.className = "stat-value text-red";
@@ -193,10 +235,9 @@
                 juncEl.className = "stat-value text-yellow";
             } else {
                 juncEl.innerText = "NONE";
-                juncEl.className = "stat-value";
+                juncEl.className = "stat-value text-gray";
             }
 
-            // 2. POSITION DETECTION (Weighted Average)
             if (count === 0) {
                 posEl.innerText = "LOST";
                 posEl.className = "stat-value text-red";
