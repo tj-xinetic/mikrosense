@@ -3,30 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mikrobotik Line Sensor Detection By Tj</title>
+    <title>Mikrobotik Race Engineer By Tj</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        /* Header */
         header { background: #1e293b; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; }
         .logo { font-size: 1.2rem; font-weight: 900; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; }
         button { background: #0ea5e9; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button.connected { background: #ef4444; } /* Changed to Red for Disconnect */
+        button.connected { background: #ef4444; } 
+        button.action-btn { background: #475569; padding: 6px 12px; font-size: 0.8rem; margin-top: 10px; border-radius: 4px; cursor: pointer; color: white; border: none;}
 
-        /* Main Content Grid */
         .dashboard { display: grid; grid-template-columns: 1fr; gap: 15px; padding: 15px; flex-grow: 1; overflow-y: auto; }
-        @media (min-width: 768px) { .dashboard { grid-template-columns: 1fr 1fr; } }
+        @media (min-width: 1024px) { .dashboard { grid-template-columns: 1fr 1fr 1fr; } }
+        @media (min-width: 768px) and (max-width: 1023px) { .dashboard { grid-template-columns: 1fr 1fr; } }
         
         .panel { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
         .panel h2 { font-size: 1rem; color: #94a3b8; margin-bottom: 15px; text-transform: uppercase; }
 
-        /* Visualizer */
         .sensor-array { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 2px dashed #334155; margin-bottom: 15px; }
         .sensor-dot { width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 4px solid #cbd5e1; transition: 0.1s; display: flex; align-items: center; justify-content: center; color: black; font-weight: bold; }
         .sensor-dot.active { background: #1e1e1e; border-color: #ef4444; color: #ef4444; box-shadow: 0 0 15px #ef4444; }
 
-        /* Status Texts */
         .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .stat-box { background: #0f172a; padding: 15px; border-radius: 8px; text-align: center; }
         .stat-label { font-size: 0.8rem; color: #94a3b8; }
@@ -36,20 +34,33 @@
         .text-yellow { color: #eab308 !important; }
         .text-gray { color: #64748b !important; }
 
-        /* Threshold Slider */
-        .controls { display: flex; flex-direction: column; gap: 10px; }
-        input[type="range"] { width: 100%; cursor: pointer; }
+        .controls { display: flex; flex-direction: column; gap: 12px; background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .input-group { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: #cbd5e1; }
+        .input-group input[type="number"], .input-group input[type="range"] { background: #1e293b; color: white; border: 1px solid #334155; padding: 5px; border-radius: 4px; width: 80px; text-align: center; }
+        .input-group input[type="range"] { width: 100px; }
         
-        /* Raw Data Grid */
+        .calc-box { background: #1e293b; padding: 10px; border-radius: 6px; border: 1px dashed #475569; font-size: 0.85rem; }
+        .radio-group { display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; font-weight: bold; margin-top: 10px;}
+        .radio-item { display: flex; align-items: center; gap: 10px; background: #0f172a; padding: 8px; border-radius: 6px; border: 1px solid #334155;}
+        
         .raw-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; text-align: center; }
         .raw-card { background: #0f172a; padding: 10px 5px; border-radius: 6px; }
         .raw-val { font-size: 1.2rem; font-weight: bold; margin-top: 5px; }
+        
+        .active-display { font-size: 1.2rem; font-weight: bold; color: #38bdf8; text-align: center; padding: 10px; background: #0f172a; border-radius: 8px; border: 2px solid #0ea5e9; margin-top: 10px;}
+
+        /* PID Suggestion Styles */
+        .pid-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .pid-card { background: #0f172a; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #38bdf8; }
+        .pid-title { font-size: 0.9rem; font-weight: bold; color: #cbd5e1; }
+        .pid-val { font-size: 1.5rem; font-weight: 900; color: white; }
+        .pid-desc { font-size: 0.75rem; color: #64748b; margin-top: 5px; }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo">Mikrobotik Line Sensor Detection By Tj</div>
+        <div class="logo">Mikrobotik Race Engineer</div>
         <button id="connectBtn">🔌 Connect USB</button>
     </header>
 
@@ -74,55 +85,211 @@
                     <div class="stat-value text-gray" id="juncText">--</div>
                 </div>
             </div>
+            <div class="raw-grid" id="rawGrid" style="margin-top: 15px;"></div>
         </div>
 
         <div class="panel">
-            <h2>Calibration & Data</h2>
+            <h2>Threshold Configuration</h2>
             <div class="controls">
-                <label style="color:#94a3b8; font-size:0.9rem;">
-                    Black Line Threshold: <span id="threshDisp" style="color:white; font-weight:bold;">500</span>
-                </label>
-                <input type="range" id="thresholdSlider" min="0" max="1023" value="500">
-                <p style="font-size:0.75rem; color:#64748b; margin-bottom:15px;">
-                    *Values ABOVE threshold are considered BLACK. Adjust if robot behaves erratically.
-                </p>
+                <div style="font-size: 0.9rem; color: #cbd5e1; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Min: <strong id="dispMin" class="text-green">--</strong></span>
+                    <span>Max: <strong id="dispMax" class="text-red">--</strong></span>
+                    <button class="action-btn" id="resetBtn" style="margin:0;">Reset Memory</button>
+                </div>
+
+                <hr style="border: 1px solid #334155; margin: 5px 0;">
+
+                <div class="input-group">
+                    <label>Bias (0-100%): <span id="percDisp">50</span>%</label>
+                    <input type="range" id="percInput" min="10" max="90" value="50">
+                </div>
+                <div class="input-group">
+                    <label>Max Bump (White):</label>
+                    <input type="number" id="bumpInput" value="300" min="0" max="1023">
+                </div>
+
+                <div class="calc-box">
+                    <div>Normal Suggestion: <strong id="calcNormal" class="text-green">--</strong></div>
+                    <div style="margin-top: 5px;">Bump Compensated: <strong id="calcBump" class="text-yellow">--</strong></div>
+                </div>
+
+                <div class="radio-group">
+                    <div class="radio-item">
+                        <input type="radio" name="mode" value="normal"> <label>Use Normal Suggestion</label>
+                    </div>
+                    <div class="radio-item" style="border-color: #eab308;">
+                        <input type="radio" name="mode" value="bump" checked> <label>Use Bump Compensated</label>
+                    </div>
+                    <div class="radio-item">
+                        <input type="radio" name="mode" value="manual"> <label>Manual Override:</label>
+                        <input type="number" id="manualInput" value="350" style="width: 70px; padding: 3px; border-radius: 4px; background:#1e293b; color:white; border:1px solid #334155;">
+                    </div>
+                </div>
+
+                <div class="active-display">
+                    Active Threshold: <span id="activeThreshDisp">WAITING</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Mission Parameters (Auto-Tuned)</h2>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 15px;">
+                Track Safety Margin: <strong id="marginDisp" class="text-gray">WAITING</strong><br>
+                Based on the gap between your max black and white bumps.
             </div>
 
-            <div class="raw-grid" id="rawGrid">
+            <div class="pid-grid">
+                <div class="pid-card" style="border-left-color: #a855f7;">
+                    <div>
+                        <div class="pid-title">Max Safe Speed</div>
+                        <div class="pid-desc">Suggested motor power</div>
+                    </div>
+                    <div class="pid-val" id="recSpeed">--</div>
                 </div>
+                
+                <div class="pid-card" style="border-left-color: #3b82f6;">
+                    <div>
+                        <div class="pid-title">Kp (Proportional)</div>
+                        <div class="pid-desc">Turn aggression</div>
+                    </div>
+                    <div class="pid-val" id="recP">--</div>
+                </div>
+
+                <div class="pid-card" style="border-left-color: #ef4444;">
+                    <div>
+                        <div class="pid-title">Ki (Integral)</div>
+                        <div class="pid-desc">Error memory</div>
+                    </div>
+                    <div class="pid-val" id="recI">0.00</div>
+                </div>
+
+                <div class="pid-card" style="border-left-color: #10b981;">
+                    <div>
+                        <div class="pid-title">Kd (Derivative)</div>
+                        <div class="pid-desc">Shock absorber</div>
+                    </div>
+                    <div class="pid-val" id="recD">--</div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        let port;
-        let reader;
-        let threshold = 500;
-        let isConnected = false;
-        const slider = document.getElementById('thresholdSlider');
-        const threshDisp = document.getElementById('threshDisp');
-        const connectBtn = document.getElementById('connectBtn');
+        let port, reader, isConnected = false;
+        
+        // Memory variables
+        let globalMin = 1023;
+        let globalMax = 0;
+        
+        // Logic variables
+        let userPercent = 50;
+        let bumpValue = 300;
+        let manualValue = 350;
+        let activeMode = "bump"; 
+        let currentThreshold = 350;
 
-        // Update threshold when slider moves
-        slider.addEventListener('input', (e) => {
-            threshold = parseInt(e.target.value);
-            threshDisp.innerText = threshold;
+        // DOM Elements
+        const percInput = document.getElementById('percInput');
+        const bumpInput = document.getElementById('bumpInput');
+        const manualInput = document.getElementById('manualInput');
+        const radios = document.getElementsByName('mode');
+
+        percInput.addEventListener('input', (e) => {
+            userPercent = parseInt(e.target.value);
+            document.getElementById('percDisp').innerText = userPercent;
+            recalculate();
         });
 
-        // Listen for physical cable disconnects via the browser hardware API
-        navigator.serial.addEventListener("disconnect", (event) => {
-            if (port && event.target === port) {
-                forceDisconnectUI();
+        bumpInput.addEventListener('input', (e) => {
+            bumpValue = parseInt(e.target.value) || 0;
+            recalculate();
+        });
+
+        manualInput.addEventListener('input', (e) => {
+            manualValue = parseInt(e.target.value) || 0;
+            if(activeMode === "manual") recalculate();
+        });
+
+        radios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                activeMode = e.target.value;
+                recalculate();
+            });
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            globalMin = 1023;
+            globalMax = 0;
+            document.getElementById('dispMin').innerText = "--";
+            document.getElementById('dispMax').innerText = "--";
+            recalculate();
+        });
+
+        function recalculate() {
+            let normalSuggest = 0;
+            let bumpSuggest = 0;
+            let p = userPercent / 100;
+
+            if (globalMax > globalMin && globalMin !== 1023) {
+                normalSuggest = Math.floor(globalMin + ((globalMax - globalMin) * p));
+                let safeBump = Math.min(bumpValue, globalMax - 1); 
+                bumpSuggest = Math.floor(safeBump + ((globalMax - safeBump) * p));
+                
+                // Calculate PID & Speed based on track margin
+                calculatePID(globalMax, safeBump);
             }
+
+            document.getElementById('calcNormal').innerText = normalSuggest > 0 ? normalSuggest : "--";
+            document.getElementById('calcBump').innerText = bumpSuggest > 0 ? bumpSuggest : "--";
+
+            if (activeMode === "normal" && normalSuggest > 0) currentThreshold = normalSuggest;
+            else if (activeMode === "bump" && bumpSuggest > 0) currentThreshold = bumpSuggest;
+            else if (activeMode === "manual") currentThreshold = manualValue;
+
+            document.getElementById('activeThreshDisp').innerText = currentThreshold;
+        }
+
+        function calculatePID(max, bump) {
+            let margin = max - bump;
+            const marginEl = document.getElementById('marginDisp');
+            const sEl = document.getElementById('recSpeed');
+            const pEl = document.getElementById('recP');
+            const dEl = document.getElementById('recD');
+
+            if (margin < 60) {
+                // High risk, very bumpy
+                marginEl.innerText = margin + " (DANGEROUS)";
+                marginEl.className = "text-red";
+                sEl.innerText = "50 - 60";
+                pEl.innerText = "0.05";
+                dEl.innerText = "0.80";
+            } else if (margin < 120) {
+                // Medium risk
+                marginEl.innerText = margin + " (MODERATE)";
+                marginEl.className = "text-yellow";
+                sEl.innerText = "65 - 75";
+                pEl.innerText = "0.07";
+                dEl.innerText = "0.60";
+            } else {
+                // Low risk, good track
+                marginEl.innerText = margin + " (SAFE)";
+                marginEl.className = "text-green";
+                sEl.innerText = "80 - 100";
+                pEl.innerText = "0.09";
+                dEl.innerText = "0.30";
+            }
+        }
+
+        // Serial Connection Logic
+        navigator.serial.addEventListener("disconnect", (event) => {
+            if (port && event.target === port) forceDisconnectUI();
         });
 
-        connectBtn.addEventListener('click', async () => {
+        document.getElementById('connectBtn').addEventListener('click', async () => {
             if (isConnected) {
-                // If they click the button while connected, forcefully disconnect
                 try {
-                    if (reader) {
-                        await reader.cancel();
-                        reader.releaseLock();
-                    }
+                    if (reader) { await reader.cancel(); reader.releaseLock(); }
                     if (port) await port.close();
                 } catch(e) {}
                 forceDisconnectUI();
@@ -133,13 +300,11 @@
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 115200 });
                 isConnected = true;
-                connectBtn.innerText = "🔌 Disconnect";
-                connectBtn.classList.add('connected');
+                const btn = document.getElementById('connectBtn');
+                btn.innerText = "🔌 Disconnect";
+                btn.classList.add('connected');
                 readData();
-            } catch (err) {
-                alert("Connection failed or canceled.");
-                forceDisconnectUI();
-            }
+            } catch (err) { alert("Connection failed."); forceDisconnectUI(); }
         });
 
         async function readData() {
@@ -155,39 +320,25 @@
                     buffer += value;
                     
                     let lines = buffer.split('\n');
-                    buffer = lines.pop(); // Keep the incomplete piece in buffer
+                    buffer = lines.pop(); 
 
                     for (let line of lines) {
-                        if (line.trim().length > 0) {
-                            processLine(line.trim());
-                        }
+                        if (line.trim().length > 0) processLine(line.trim());
                     }
                 }
-            } catch (error) {
-                // This catches the error specifically when the USB cable is yanked out mid-stream
-                console.warn("Stream broken or cable disconnected.");
-                forceDisconnectUI();
-            } finally {
-                if (reader) reader.releaseLock();
-            }
+            } catch (error) { forceDisconnectUI(); } 
+            finally { if (reader) reader.releaseLock(); }
         }
 
         function forceDisconnectUI() {
             isConnected = false;
-            connectBtn.innerText = "🔌 Connect USB";
-            connectBtn.classList.remove('connected');
-            
-            // Reset UI states
+            const btn = document.getElementById('connectBtn');
+            btn.innerText = "🔌 Connect USB";
+            btn.classList.remove('connected');
             document.getElementById('posText').innerText = "DISCONNECTED";
-            document.getElementById('posText').className = "stat-value text-red";
             document.getElementById('juncText').innerText = "--";
-            document.getElementById('juncText').className = "stat-value text-gray";
             document.getElementById('rawGrid').innerHTML = "";
-            
-            // Turn off all dots
-            for(let i=1; i<=5; i++) {
-                document.getElementById(`dot${i}`).classList.remove('active');
-            }
+            for(let i=1; i<=5; i++) document.getElementById(`dot${i}`).classList.remove('active');
         }
 
         function processLine(line) {
@@ -201,7 +352,10 @@
                 const val = parseInt(valStr);
                 if(isNaN(val)) return '';
                 
-                const isLine = val > threshold;
+                if (val < globalMin) globalMin = val;
+                if (val > globalMax) globalMax = val;
+
+                const isLine = val > currentThreshold;
                 if(isLine) activeSensors.push(index + 1);
 
                 const dot = document.getElementById(`dot${index + 1}`);
@@ -215,6 +369,11 @@
                     </div>`;
             }).join('');
             
+            document.getElementById('dispMin').innerText = globalMin;
+            document.getElementById('dispMax').innerText = globalMax;
+            
+            recalculate(); 
+            
             document.getElementById('rawGrid').innerHTML = rawHtml;
             evaluateState(activeSensors);
         }
@@ -224,28 +383,14 @@
             const juncEl = document.getElementById('juncText');
             const count = active.length;
 
-            if (count >= 4) {
-                juncEl.innerText = "CROSS ➕";
-                juncEl.className = "stat-value text-red";
-            } else if (count >= 3 && active.includes(1) && active.includes(2) && !active.includes(5)) {
-                juncEl.innerText = "LEFT T ┣";
-                juncEl.className = "stat-value text-yellow";
-            } else if (count >= 3 && active.includes(5) && active.includes(4) && !active.includes(1)) {
-                juncEl.innerText = "RIGHT T ┫";
-                juncEl.className = "stat-value text-yellow";
-            } else {
-                juncEl.innerText = "NONE";
-                juncEl.className = "stat-value text-gray";
-            }
+            if (count >= 4) { juncEl.innerText = "CROSS ➕"; juncEl.className = "stat-value text-red"; } 
+            else if (count >= 3 && active.includes(1) && active.includes(2) && !active.includes(5)) { juncEl.innerText = "LEFT T ┣"; juncEl.className = "stat-value text-yellow"; } 
+            else if (count >= 3 && active.includes(5) && active.includes(4) && !active.includes(1)) { juncEl.innerText = "RIGHT T ┫"; juncEl.className = "stat-value text-yellow"; } 
+            else { juncEl.innerText = "NONE"; juncEl.className = "stat-value text-gray"; }
 
-            if (count === 0) {
-                posEl.innerText = "LOST";
-                posEl.className = "stat-value text-red";
-                return;
-            }
+            if (count === 0) { posEl.innerText = "LOST"; posEl.className = "stat-value text-red"; return; }
 
-            let sum = active.reduce((a, b) => a + b, 0);
-            let avg = sum / count;
+            let avg = active.reduce((a, b) => a + b, 0) / count;
 
             posEl.className = "stat-value text-green";
             if (avg === 3) posEl.innerText = "CENTER";
